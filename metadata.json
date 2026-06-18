@@ -1,0 +1,6 @@
+{
+  "name": "Sundial Solar Terms",
+  "description": "An interactive digital sundial exploring the 24 traditional Chinese solar terms through real-time shadow play and AI wisdom.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
