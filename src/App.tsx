@@ -8,6 +8,11 @@ import GestureOverlay from './components/GestureOverlay';
 import { Compass, CalendarDays, BookOpen, Clock, Waves, ChevronRight, Wind, Snowflake, Flame, Sun, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+const springImg = '/src/assets/images/season_spring_1781752388171.jpg';
+const summerImg = '/src/assets/images/season_summer_1781752400894.jpg';
+const autumnImg = '/src/assets/images/season_autumn_1781752412470.jpg';
+const winterImg = '/src/assets/images/season_winter_1781752421896.jpg';
+
 export default function App() {
   const [activeSeason, setActiveSeason] = useState<Season>('spring');
   const [selectedTerm, setSelectedTerm] = useState<SolarTerm>(solarTermsData[0]); // default 立春
@@ -15,6 +20,74 @@ export default function App() {
   const [isShadowFixed, setIsShadowFixed] = useState(false);
   const [viewMode, setViewMode] = useState<'sundial' | 'detail'>('sundial');
   const [handPointer, setHandPointer] = useState<HandData | null>(null);
+  
+  // Interactive pointer trail particles
+  const [trail, setTrail] = useState<{ x: number; y: number; id: number; size: number; dx: number; dy: number }[]>([]);
+
+  // Spawn trail on hover/drag or camera tracker movement
+  useEffect(() => {
+    if (viewMode !== 'sundial') return;
+
+    const spawnParticle = (x: number, y: number) => {
+      // Spawn 2 particles for a richer feeling
+      const p1 = {
+        x: x + (Math.random() * 16 - 8),
+        y: y + (Math.random() * 16 - 8),
+        id: Math.random(),
+        size: Math.random() * 16 + 8, // larger and clearer particles in corners and center
+        dx: Math.random() * 240 - 120, // wider horizontal swirl
+        dy: Math.random() * -220 - 80,  // tall float up
+      };
+      const p2 = {
+        x: x + (Math.random() * 16 - 8),
+        y: y + (Math.random() * 16 - 8),
+        id: Math.random(),
+        size: Math.random() * 10 + 5,
+        dx: Math.random() * 160 - 80,
+        dy: Math.random() * -160 - 50,
+      };
+
+      setTrail(prev => [p1, p2, ...prev].slice(0, 60)); // keep up to 60 elements for highly responsive trails
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (handPointer && handPointer.isActive) return;
+      spawnParticle(e.clientX, e.clientY);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (handPointer && handPointer.isActive) return;
+      if (e.touches[0]) {
+        spawnParticle(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('touchmove', handleTouchMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, [viewMode, handPointer]);
+
+  // Sync handPointer updates into the particle trail system
+  useEffect(() => {
+    if (viewMode === 'sundial' && handPointer && handPointer.isActive) {
+      const xPx = handPointer.x * window.innerWidth;
+      const yPx = handPointer.y * window.innerHeight;
+      
+      const p1 = {
+        x: xPx + (Math.random() * 10 - 5),
+        y: yPx + (Math.random() * 10 - 5),
+        id: Math.random(),
+        size: Math.random() * 20 + 8, // Extra large for hand recognition to look beautiful
+        dx: Math.random() * 300 - 150,
+        dy: Math.random() * -250 - 100,
+      };
+      
+      setTrail(prev => [p1, ...prev].slice(0, 60));
+    }
+  }, [handPointer, viewMode]);
 
   // Sync active season with selectedTerm season changes (from sundial tracking)
   const handleTermSelectedFromSundial = (term: SolarTerm) => {
@@ -34,7 +107,7 @@ export default function App() {
 
   // Render a clean CSS background/particle system based on active season
   const renderBackgroundParticles = () => {
-    const particlesCount = 24;
+    const particlesCount = 48;
     return (
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         {Array.from({ length: particlesCount }).map((_, i) => {
@@ -86,6 +159,60 @@ export default function App() {
                 animationIterationCount: 'infinite',
                 animationTimingFunction: 'linear',
               }}
+            >
+              {content}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Render highly responsive theme-colored trails following gesture movements
+  const renderInteractiveTrail = () => {
+    if (viewMode !== 'sundial') return null;
+    return (
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-30">
+        {trail.map(p => {
+          let content: React.ReactNode = null;
+          if (activeSeason === 'spring') {
+            content = (
+              <div 
+                className="w-full h-full rounded-full opacity-80 bg-pink-400 shadow-[0_0_6px_#f472b6]"
+                style={{ borderRadius: '50% 0 50% 50%', transform: `rotate(${Math.random() * 360}deg)` }}
+              />
+            );
+          } else if (activeSeason === 'summer') {
+            content = (
+              <div className="w-full h-full rounded-full bg-yellow-400 shadow-[0_0_12px_#f59e0b] blur-[0.5px]" />
+            );
+          } else if (activeSeason === 'autumn') {
+            content = (
+              <div 
+                className="w-full h-full bg-amber-500 rounded-sm shadow-[0_0_6px_#d97706]"
+                style={{ transform: `skewX(12deg) rotate(${Math.random() * 365}deg)` }}
+              />
+            );
+          } else {
+            content = (
+              <Snowflake className="w-full h-full text-blue-300 drop-shadow-[0_0_4px_rgba(147,197,253,0.9)]" />
+            );
+          }
+
+          return (
+            <div
+              key={p.id}
+              className="absolute pointer-events-none"
+              style={{
+                left: `${p.x}px`,
+                top: `${p.y}px`,
+                width: `${p.size}px`,
+                height: `${p.size}px`,
+                transform: 'translate(-50%, -50%)',
+                animation: 'particleFloat 1.0s cubic-bezier(0.1, 0.8, 0.3, 1) forwards',
+                '--dx': `${p.dx}px`,
+                '--dy': `${p.dy}px`,
+              } as React.CSSProperties}
             >
               {content}
             </div>
@@ -147,16 +274,41 @@ export default function App() {
   return (
     <div 
       className={`min-h-screen flex flex-col font-sans relative overflow-hidden transition-all duration-700 ${
-        viewMode === 'sundial' ? 'bg-gradient-to-b ' + currentThemeBg : 'text-[#f8fafc]'
+        viewMode === 'detail' 
+          ? 'text-stone-850' 
+          : (viewMode === 'sundial' ? 'bg-gradient-to-b ' + currentThemeBg : 'text-[#f8fafc]')
       }`}
-      style={viewMode === 'detail' ? {
-        backgroundImage: `radial-gradient(circle at 50% 25%, ${selectedTerm.themeColor}1c 0%, #030712 90%)`,
-        backgroundColor: '#030712'
-      } : {}}
+      style={viewMode === 'detail' ? (() => {
+        const s = selectedTerm.season;
+        if (s === 'spring') {
+          return {
+            backgroundImage: 'radial-gradient(circle at 50% 25%, #fffbfb 0%, #fff0f2 40%, #ffdeeed7 75%, #ffd1e3d7 100%)',
+            backgroundColor: '#fff0f2'
+          };
+        } else if (s === 'summer') {
+          return {
+            backgroundImage: 'radial-gradient(circle at 50% 25%, #fafdfb 0%, #edf9f2 40%, #d8f3e2 75%, #c2edd1 100%)',
+            backgroundColor: '#edf9f2'
+          };
+        } else if (s === 'autumn') {
+          return {
+            backgroundImage: 'radial-gradient(circle at 50% 25%, #faf7f2 0%, #f7f1e8 40%, #ebdcb9 75%, #edd2a1 100%)',
+            backgroundColor: '#f7f1e8'
+          };
+        } else {
+          return {
+            backgroundImage: 'radial-gradient(circle at 50% 25%, #ffffff 0%, #f6f8fa 40%, #edf0f5 75%, #e1e4eb 100%)',
+            backgroundColor: '#f6f8fa'
+          };
+        }
+      })() : {}}
     >
       
       {/* Visual background atmospheric particles */}
       {renderBackgroundParticles()}
+
+      {/* Interactive dynamic trail particles */}
+      {renderInteractiveTrail()}
 
       {/* Styled CSS animation overrides for particles falling */}
       <style>{`
@@ -174,6 +326,18 @@ export default function App() {
           100% {
             transform: translateY(105vh) rotate(360deg) translateX(40px);
             opacity: 0;
+          }
+        }
+        @keyframes particleFloat {
+          0% {
+            transform: translate(-50%, -50%) scale(1) rotate(0deg);
+            opacity: 0.95;
+            filter: blur(0px);
+          }
+          100% {
+            transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.15) rotate(270deg);
+            opacity: 0;
+            filter: blur(2px);
           }
         }
         .animate-fall {
@@ -237,293 +401,197 @@ export default function App() {
       </header>
 
       {/* Main Container Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-center relative z-10">
+      <main className={`flex-1 w-full flex flex-col relative z-10 transition-all duration-500 ${viewMode === 'sundial' ? 'p-0 max-w-none' : 'max-w-7xl mx-auto p-4 sm:p-6 justify-center'}`}>
         <AnimatePresence mode="wait">
           {viewMode === 'sundial' ? (
             <motion.div
               key="sundial-view"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              className="w-full flex flex-col gap-6 py-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="relative w-full flex-1 min-h-[calc(100vh-160px)] flex flex-col items-center justify-center select-none overflow-hidden"
             >
+              {/* Four Quadrants: Spring, Summer, Autumn, Winter stretching fully in background corners */}
               
-              {/* Highlight Prominent Season Selector Dashboard (Highly visible to replace the easily missed top-right nav) */}
-              <div id="prominent-season-selector-dashboard" className={`w-full max-w-4xl mx-auto mb-2 backdrop-blur-md border p-3 sm:p-5 rounded-3xl shadow-xl relative overflow-hidden transition-all duration-500 ${
-                viewMode === 'sundial' 
-                  ? 'bg-stone-50/80 border-stone-250 shadow-md' 
-                  : 'bg-slate-900/40 border-slate-800 shadow-xl'
-              }`}>
-                <div className={`absolute top-0 left-0 right-0 h-[1px] ${
-                  viewMode === 'sundial' ? 'bg-stone-200' : 'bg-gradient-to-r from-transparent via-slate-600/35 to-transparent'
-                }`} />
+              {/* Top Left: Spring */}
+              <button
+                onClick={() => handleSeasonChange('spring')}
+                className={`absolute top-0 left-0 w-[50%] h-[50%] overflow-hidden cursor-pointer transition-all duration-[800ms] ease-out z-10 select-none ${
+                  activeSeason === 'spring'
+                    ? 'opacity-100 scale-100 z-20'
+                    : 'opacity-30 hover:opacity-90 hover:scale-[1.01] grayscale-[40%] hover:grayscale-0'
+                }`}
+                style={{ clipPath: 'polygon(0 0, 100% 0, 0 100%)' }}
+                title="春季"
+              >
+                <img
+                  src={springImg}
+                  alt="春"
+                  className="w-full h-full object-cover transition-transform duration-[2s] hover:scale-105"
+                  referrerPolicy="no-referrer"
+                />
                 
-                <h3 className={`text-[10px] font-sans font-bold tracking-widest uppercase text-center mb-3 transition-colors ${
-                  viewMode === 'sundial' ? 'text-slate-500' : 'text-slate-400'
-                }`}>
-                  ☯ 四季流转系统轨道 • SELECT SEASON ORBITAL PATHWAY
-                </h3>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-                  {(['spring', 'summer', 'autumn', 'winter'] as Season[]).map((season) => {
-                    const info = seasonsData[season];
-                    const isActive = activeSeason === season;
-                    
-                    let icon = "🌸";
-                    let label = "春 • 发生万物";
-                    let poet = "东风解冻，春和景明";
-                    let badge = "春";
-                    if (season === 'spring') {
-                      icon = "🌸"; label = "春 • 发生万物"; poet = "东风解冻，春美景和"; badge = "春";
-                    } else if (season === 'summer') {
-                      icon = "☀️"; label = "夏 • 盛长茂郁"; poet = "万物繁盛，流火如夏"; badge = "夏";
-                    } else if (season === 'autumn') {
-                      icon = "🍁"; label = "秋 • 获收敛美"; poet = "白露秋霜，金色收仓"; badge = "秋";
-                    } else {
-                      icon = "❄️"; label = "冬 • 藏闭纳养"; poet = "朔风冷傲，万象藏聚"; badge = "冬";
-                    }
-
-                    return (
-                      <button
-                        key={season}
-                        id={`season-btn-${season}`}
-                        onClick={() => handleSeasonChange(season)}
-                        className={`group relative text-left p-3 sm:p-4 rounded-2xl border transition-all duration-300 flex flex-col justify-between cursor-pointer overflow-hidden ${
-                          isActive 
-                            ? 'bg-stone-100 border-stone-300 shadow-md' 
-                            : viewMode === 'sundial'
-                              ? 'bg-stone-200/40 border-stone-200 hover:border-stone-300 hover:bg-stone-100/65'
-                              : 'bg-slate-950/40 border-slate-850 hover:border-slate-800 hover:bg-slate-900/10'
-                        }`}
-                        style={isActive ? { borderColor: info.themeColor, boxShadow: `0 8px 16px -8px ${info.themeColor}55` } : {}}
-                      >
-                        {/* Ambient glow in button */}
-                        <div 
-                          className="absolute right-0 bottom-0 w-12 h-12 rounded-full opacity-10 filter blur-[15px] transition-transform duration-500 group-hover:scale-150"
-                          style={{ backgroundColor: info.themeColor }}
-                        />
-
-                        <div className="flex items-center justify-between w-full mb-1">
-                          <span className="text-xl sm:text-2xl transition-transform duration-300 group-hover:scale-110">{icon}</span>
-                          <span className={`text-[9px] font-mono tracking-widest px-1.5 py-0.5 rounded-md ${isActive ? 'bg-slate-950/60 font-bold' : 'bg-slate-950/20 text-slate-500'}`} style={isActive ? { color: info.themeColor } : {}}>
-                            {badge}
-                          </span>
-                        </div>
-
-                        <div>
-                          <div className={`text-base font-serif font-bold tracking-wide transition-colors ${
-                            isActive 
-                              ? 'text-slate-900 font-extrabold' 
-                              : viewMode === 'sundial'
-                                ? 'text-slate-700 group-hover:text-slate-900'
-                                : 'text-slate-400 group-hover:text-slate-200'
-                          }`}>
-                            {label}
-                          </div>
-                          <div className={`text-[10px] font-serif leading-none mt-1 line-clamp-1 truncate transition-colors ${
-                            isActive 
-                              ? 'text-slate-600 font-medium' 
-                              : 'text-stone-500 group-hover:text-stone-700'
-                          }`}>
-                            {poet}
-                          </div>
-                        </div>
-
-                        {/* Top neon strip */}
-                        {isActive && (
-                          <div className="absolute left-0 right-0 top-0 h-[2px]" style={{ backgroundColor: info.themeColor }} />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Main Content Layout Grid */}
-               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                
-                {/* Left Column: Hand Tracker & Minimal Info */}
-                <div className="lg:col-span-4 space-y-4 order-2 lg:order-1 select-none">
-                  <div className="space-y-1">
-                    <span className={`inline-block px-2 py-0.5 border rounded-lg text-[9px] font-mono font-semibold tracking-widest ${style.badgeColor}`}>
-                      {seasonsData[activeSeason].nameFull}
-                    </span>
-                    <h2 className={`text-lg font-serif font-black tracking-wider transition-colors ${
-                      viewMode === 'sundial' ? 'text-slate-850' : 'text-slate-100'
-                    }`}>
-                      隔空对轨感应 ☯
-                    </h2>
-                  </div>
-
-                  {/* High Fidelity Gesture Live Status Monitor Table Card */}
-                  <div className="bg-stone-50/80 border border-stone-250/90 rounded-2xl p-4 shadow-sm space-y-3 transition-all">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase tracking-widest font-mono text-stone-500 font-semibold">控轨状态 MONITOR</span>
-                      {handPointer && handPointer.isActive ? (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-[9px] font-mono font-bold text-emerald-700 border border-emerald-250 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                          <span>手势已捕获</span>
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-50 text-[9px] font-mono font-bold text-amber-700 border border-amber-200/80 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                          <span>相机就绪中</span>
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="p-2.5 bg-stone-100/75 rounded-xl border border-stone-200/55">
-                        <div className="font-serif font-black text-slate-800 text-[11px] mb-0.5">☝️ 隔空指划</div>
-                        <p className="text-[9.5px] text-slate-500 leading-snug">
-                          双指移动对准晷面刻度，选择节气
-                        </p>
-                      </div>
-
-                      <div className="p-2.5 bg-stone-100/75 rounded-xl border border-stone-200/55">
-                        <div className="font-serif font-black text-slate-850 text-[11px] mb-0.5">✊ 弯指锁定</div>
-                        <p className="text-[9.5px] text-slate-500 leading-snug">
-                          合拢双指或锁定悬停 1.2 秒进入详情
-                        </p>
-                      </div>
-                    </div>
-
-                    <p className="text-[9px] leading-tight text-slate-400 text-center font-sans">
-                      * 摄像头位于页面左下角，保障大屏流畅操控
-                    </p>
-                  </div>
-
-                  <div className={`h-[1px] bg-gradient-to-r ${
-                    viewMode === 'sundial' 
-                      ? 'from-stone-300 via-stone-200 to-transparent' 
-                      : 'from-slate-900 via-slate-800 to-transparent'
-                  }`} />
-
-                  {/* Simplified Current Hour mini card */}
-                  <div className={`backdrop-blur rounded-2xl p-4 border flex items-center justify-between shadow-sm transition-all duration-300 ${
-                    viewMode === 'sundial' 
-                      ? 'bg-stone-100/50 border-stone-200/60' 
-                      : 'bg-slate-900/30 border-slate-900/80'
-                  }`}>
-                    <div className="flex items-center space-x-2.5">
-                      <Clock className={`w-4 h-4 ${style.textColor}`} />
-                      <div>
-                        <span className={`text-xs font-bold font-serif ${viewMode === 'sundial' ? 'text-slate-800' : 'text-slate-200'}`}>{currentHour.name}</span>
-                        <span className="text-[10px] font-mono text-slate-500 ml-1.5">{currentHour.range}</span>
-                      </div>
-                    </div>
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border transition-all ${
-                      viewMode === 'sundial' 
-                        ? 'bg-stone-200/50 border-stone-300 text-slate-700' 
-                        : `bg-slate-950/40 border-slate-800 ${style.textColor}`
-                    }`}>
-                      经穴: {currentHour.meridian}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Central Column: Sundial Board */}
-                <div className="lg:col-span-4 flex items-center justify-center order-1 lg:order-2">
-                  <SundialPlate
-                    activeSeason={activeSeason}
-                    selectedTerm={selectedTerm}
-                    onTermSelected={handleTermSelectedFromSundial}
-                    isShadowFixed={isShadowFixed}
-                    setIsShadowFixed={(fixed) => {
-                      setIsShadowFixed(fixed);
-                      if (fixed) {
-                        // Click shadow to lock -> Auto-travel/navigate instantly to the dedicated detail long chronicle page!
-                        setTimeout(() => {
-                           setViewMode('detail');
-                        }, 250);
-                      }
-                    }}
-                    onHourChange={setCurrentHour}
-                    handPointer={handPointer}
+                {/* Diagonal Edge Stroke */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <line 
+                    x1="100" y1="0" x2="0" y2="100" 
+                    stroke={activeSeason === 'spring' ? '#10b981' : 'rgba(255,255,255,0.18)'} 
+                    strokeWidth={activeSeason === 'spring' ? '3' : '0.6'} 
+                    className="transition-all duration-700"
                   />
+                </svg>
+
+                {/* Corner Stamp */}
+                <div className="absolute top-5 left-5 sm:top-10 sm:left-10 md:top-16 md:left-16 flex items-center justify-center">
+                  <span className={`font-serif font-black text-sm sm:text-base md:text-xl lg:text-3xl w-10 h-10 sm:w-16 sm:h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 rounded-full flex items-center justify-center shadow-2xl transition-all duration-500 ${
+                    activeSeason === 'spring'
+                      ? 'bg-emerald-500 text-white font-extrabold rotate-0 scale-110 ring-4 ring-emerald-500/20'
+                      : 'bg-white/80 md:bg-white/90 text-stone-700 backdrop-blur-sm shadow-md'
+                  }`}>
+                    春
+                  </span>
                 </div>
+              </button>
 
-                {/* Right Column: Matched solar term instant card */}
-                <div className="lg:col-span-4 order-3">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={selectedTerm.id}
-                      initial={{ opacity: 0, x: 15 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -15 }}
-                      className={`backdrop-blur-md rounded-3xl p-5 border shadow-xl relative overflow-hidden flex flex-col justify-between h-full min-h-[300px] max-w-sm mx-auto lg:mx-0 transition-all duration-500 ${
-                        viewMode === 'sundial' 
-                          ? 'bg-stone-50/85 border-stone-250 shadow-md' 
-                          : 'bg-slate-900/40 border-slate-800'
-                      }`}
-                      style={{ backgroundImage: `radial-gradient(circle at 90% 10%, ${selectedTerm.themeColor}11 0%, transparent 100%)` }}
-                    >
-                      <div>
-                        {/* Accent highlight bar */}
-                        <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ backgroundColor: selectedTerm.themeColor }} />
+              {/* Top Right: Summer */}
+              <button
+                onClick={() => handleSeasonChange('summer')}
+                className={`absolute top-0 right-0 w-[50%] h-[50%] overflow-hidden cursor-pointer transition-all duration-[800ms] ease-out z-10 select-none ${
+                  activeSeason === 'summer'
+                    ? 'opacity-100 scale-100 z-20'
+                    : 'opacity-30 hover:opacity-90 hover:scale-[1.01] grayscale-[40%] hover:grayscale-0'
+                }`}
+                style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }}
+                title="夏季"
+              >
+                <img
+                  src={summerImg}
+                  alt="夏"
+                  className="w-full h-full object-cover transition-transform duration-[2s] hover:scale-105"
+                  referrerPolicy="no-referrer"
+                />
 
-                        <div className="flex justify-between items-center mb-3">
-                          <h3 className={`text-xl font-serif font-black tracking-wide flex items-baseline space-x-1.5 transition-colors ${
-                            viewMode === 'sundial' ? 'text-slate-900' : 'text-slate-100'
-                          }`}>
-                            <span>{selectedTerm.name}</span>
-                            <span className="text-xs font-sans text-stone-500 font-normal">({selectedTerm.pinyin})</span>
-                          </h3>
-                          <span className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded-md border transition-all ${
-                            viewMode === 'sundial' 
-                              ? 'text-slate-850 bg-stone-100/90 border-stone-250' 
-                              : 'text-gray-400 bg-slate-950/60 border-slate-900'
-                          }`}>
-                            {selectedTerm.dates}
-                          </span>
-                        </div>
+                {/* Diagonal Edge Stroke */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <line 
+                    x1="0" y1="0" x2="100" y2="100" 
+                    stroke={activeSeason === 'summer' ? '#f59e0b' : 'rgba(255,255,255,0.18)'} 
+                    strokeWidth={activeSeason === 'summer' ? '3' : '0.6'} 
+                    className="transition-all duration-700"
+                  />
+                </svg>
 
-                        {/* Brief Introduction */}
-                        <p className={`text-xs leading-relaxed font-sans transition-colors ${
-                          viewMode === 'sundial' ? 'text-slate-650 font-medium animate-fade-in' : 'text-slate-300'
-                        }`}>
-                          {selectedTerm.description}
-                        </p>
-
-                        <div className={`h-px my-3.5 ${viewMode === 'sundial' ? 'bg-stone-250/70' : 'bg-slate-900'}`} />
-
-                        {/* Streamlined metadata inline grid: 2 simple columns */}
-                        <div className="grid grid-cols-2 gap-2 text-[10.5px] font-sans">
-                          <div className="flex items-center space-x-1.5">
-                            <span className="font-serif font-bold text-stone-500">候:</span>
-                            <span className={`truncate leading-none ${viewMode === 'sundial' ? 'text-stone-850 font-medium' : 'text-slate-200'}`}>
-                              {selectedTerm.threePhases[0].split(' (')[0]}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-1.5">
-                            <span className="font-serif font-bold text-stone-500">民俗:</span>
-                            <span className={`truncate leading-none ${viewMode === 'sundial' ? 'text-stone-350 font-medium' : 'text-slate-200'}`}>
-                              {selectedTerm.customs[0].split(' (')[0]}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Entrance CTA Portal Button */}
-                      <div className="mt-4">
-                        <button
-                          onClick={() => setViewMode('detail')}
-                          className="w-full py-2.5 px-4 rounded-xl text-xs font-bold font-serif transition-colors flex items-center justify-center space-x-2 cursor-pointer relative group overflow-hidden border border-slate-250 hover:bg-stone-50 text-slate-800 shadow-sm"
-                        >
-                          <span>探索“{selectedTerm.name}”长卷</span>
-                          <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 duration-300" style={{ color: selectedTerm.themeColor }} />
-                          
-                          {/* Glow indicator line */}
-                          <div 
-                            className="absolute bottom-0 left-0 w-full h-[2px] opacity-65 group-hover:opacity-100 transition-all"
-                            style={{ backgroundColor: selectedTerm.themeColor }}
-                          />
-                        </button>
-                      </div>
-                    </motion.div>
-                  </AnimatePresence>
+                {/* Corner Stamp */}
+                <div className="absolute top-5 right-5 sm:top-10 sm:right-10 md:top-16 md:right-16 flex items-center justify-center">
+                  <span className={`font-serif font-black text-sm sm:text-base md:text-xl lg:text-3xl w-10 h-10 sm:w-16 sm:h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 rounded-full flex items-center justify-center shadow-2xl transition-all duration-500 ${
+                    activeSeason === 'summer'
+                      ? 'bg-amber-500 text-white font-extrabold rotate-0 scale-110 ring-4 ring-amber-500/20'
+                      : 'bg-white/80 md:bg-white/90 text-stone-700 backdrop-blur-sm shadow-md'
+                  }`}>
+                    夏
+                  </span>
                 </div>
+              </button>
 
+              {/* Bottom Left: Autumn */}
+              <button
+                onClick={() => handleSeasonChange('autumn')}
+                className={`absolute bottom-0 left-0 w-[50%] h-[50%] overflow-hidden cursor-pointer transition-all duration-[800ms] ease-out z-10 select-none ${
+                  activeSeason === 'autumn'
+                    ? 'opacity-100 scale-100 z-20'
+                    : 'opacity-30 hover:opacity-90 hover:scale-[1.01] grayscale-[40%] hover:grayscale-0'
+                }`}
+                style={{ clipPath: 'polygon(0 0, 0 100%, 100% 100%)' }}
+                title="秋季"
+              >
+                <img
+                  src={autumnImg}
+                  alt="秋"
+                  className="w-full h-full object-cover transition-transform duration-[2s] hover:scale-105"
+                  referrerPolicy="no-referrer"
+                />
+
+                {/* Diagonal Edge Stroke */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <line 
+                    x1="0" y1="0" x2="100" y2="100" 
+                    stroke={activeSeason === 'autumn' ? '#f97316' : 'rgba(255,255,255,0.18)'} 
+                    strokeWidth={activeSeason === 'autumn' ? '3' : '0.6'} 
+                    className="transition-all duration-700"
+                  />
+                </svg>
+
+                {/* Corner Stamp */}
+                <div className="absolute bottom-5 left-5 sm:bottom-10 sm:left-10 md:bottom-16 md:left-16 flex items-center justify-center">
+                  <span className={`font-serif font-black text-sm sm:text-base md:text-xl lg:text-3xl w-10 h-10 sm:w-16 sm:h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 rounded-full flex items-center justify-center shadow-2xl transition-all duration-500 ${
+                    activeSeason === 'autumn'
+                      ? 'bg-orange-500 text-white font-extrabold rotate-0 scale-110 ring-4 ring-orange-500/20'
+                      : 'bg-white/80 md:bg-white/90 text-stone-700 backdrop-blur-sm shadow-md'
+                  }`}>
+                    秋
+                  </span>
+                </div>
+              </button>
+
+              {/* Bottom Right: Winter */}
+              <button
+                onClick={() => handleSeasonChange('winter')}
+                className={`absolute bottom-0 right-0 w-[50%] h-[50%] overflow-hidden cursor-pointer transition-all duration-[800ms] ease-out z-10 select-none ${
+                  activeSeason === 'winter'
+                    ? 'opacity-100 scale-100 z-20'
+                    : 'opacity-30 hover:opacity-90 hover:scale-[1.01] grayscale-[40%] hover:grayscale-0'
+                }`}
+                style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)' }}
+                title="冬季"
+              >
+                <img
+                  src={winterImg}
+                  alt="冬"
+                  className="w-full h-full object-cover transition-transform duration-[2s] hover:scale-105"
+                  referrerPolicy="no-referrer"
+                />
+
+                {/* Diagonal Edge Stroke */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <line 
+                    x1="100" y1="0" x2="0" y2="100" 
+                    stroke={activeSeason === 'winter' ? '#3b82f6' : 'rgba(255,255,255,0.18)'} 
+                    strokeWidth={activeSeason === 'winter' ? '3' : '0.6'} 
+                    className="transition-all duration-700"
+                  />
+                </svg>
+
+                {/* Corner Stamp */}
+                <div className="absolute bottom-5 right-5 sm:bottom-10 sm:right-10 md:bottom-16 md:right-16 flex items-center justify-center">
+                  <span className={`font-serif font-black text-sm sm:text-base md:text-xl lg:text-3xl w-10 h-10 sm:w-16 sm:h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 rounded-full flex items-center justify-center shadow-2xl transition-all duration-500 ${
+                    activeSeason === 'winter'
+                      ? 'bg-blue-500 text-white font-extrabold rotate-0 scale-110 ring-4 ring-blue-500/20'
+                      : 'bg-white/80 md:bg-white/90 text-stone-700 backdrop-blur-sm shadow-md'
+                  }`}>
+                    冬
+                  </span>
+                </div>
+              </button>
+
+              {/* Centered Sundial Interactive Plate floating above background */}
+              <div className="relative z-30 pointer-events-auto filter drop-shadow-3xl transform scale-90 sm:scale-95 md:scale-100">
+                <SundialPlate
+                  activeSeason={activeSeason}
+                  selectedTerm={selectedTerm}
+                  onTermSelected={handleTermSelectedFromSundial}
+                  isShadowFixed={isShadowFixed}
+                  setIsShadowFixed={(fixed) => {
+                    setIsShadowFixed(fixed);
+                    if (fixed) {
+                      // Click shadow to lock -> Auto-travel/navigate instantly to the dedicated detail long chronicle page!
+                      setTimeout(() => {
+                         setViewMode('detail');
+                      }, 250);
+                    }
+                  }}
+                  onHourChange={setCurrentHour}
+                  handPointer={handPointer}
+                />
               </div>
 
             </motion.div>

@@ -97,30 +97,39 @@ export default function GestureOverlay({ handPointer, termColor }: GestureOverla
     // Handle hover dwell-click logic
     if (clickable) {
       const label = getElementLabel(clickable);
+      const isSundial = clickable.id === 'sundial-plate-frame';
+
       setHoveredElementLabel(label);
 
-      if (lastTargetRef.current !== clickable) {
+      if (isSundial) {
+        // No hover dwell-click on the sundial plate as requested: "在日晷上不要悬停定位，只保留弯拢锁定"
         lastTargetRef.current = clickable;
-        hoverStartTimeRef.current = now;
+        hoverStartTimeRef.current = null;
         setDwellProgress(0);
-      } else if (hoverStartTimeRef.current) {
-        const elapsed = now - hoverStartTimeRef.current;
-        const completeDuration = 1200; // 1.2 seconds of stable hover = click
-        const ratio = Math.min(elapsed / completeDuration, 1);
-        setDwellProgress(ratio);
-
-        if (elapsed >= completeDuration) {
-          // Trigger virtual click!
-          setRippleCoords({ x: xPx, y: yPx });
-          setShowClickRipple(true);
-          setTimeout(() => setShowClickRipple(false), 600);
-
-          clickable.click();
-          lastClickedTimeRef.current = now;
-
-          // Clear hover start so it doesn't loop fire click on the same element instantly
-          hoverStartTimeRef.current = null;
+      } else {
+        if (lastTargetRef.current !== clickable) {
+          lastTargetRef.current = clickable;
+          hoverStartTimeRef.current = now;
           setDwellProgress(0);
+        } else if (hoverStartTimeRef.current) {
+          const elapsed = now - hoverStartTimeRef.current;
+          const completeDuration = 1700; // Extended by 0.5s as requested ("后续悬停定位时间延长0.5s", 1.2s + 0.5s = 1.7s)
+          const ratio = Math.min(elapsed / completeDuration, 1);
+          setDwellProgress(ratio);
+
+          if (elapsed >= completeDuration) {
+            // Trigger virtual click!
+            setRippleCoords({ x: xPx, y: yPx });
+            setShowClickRipple(true);
+            setTimeout(() => setShowClickRipple(false), 600);
+
+            clickable.click();
+            lastClickedTimeRef.current = now;
+
+            // Clear hover start so it doesn't loop fire click on the same element instantly
+            hoverStartTimeRef.current = null;
+            setDwellProgress(0);
+          }
         }
       }
     } else {
@@ -140,8 +149,8 @@ export default function GestureOverlay({ handPointer, termColor }: GestureOverla
         <div 
           className="absolute rounded-full border-4 border-yellow-400 opacity-80 animate-ping"
           style={{
-            left: rippleCoords.x - 40,
-            top: rippleCoords.y - 40,
+            left: `${rippleCoords.x - 40}px`,
+            top: `${rippleCoords.y - 40}px`,
             width: 80,
             height: 80,
           }}
@@ -152,8 +161,8 @@ export default function GestureOverlay({ handPointer, termColor }: GestureOverla
       <div 
         className="absolute -translate-x-1/2 -translate-y-1/2 transition-transform duration-100 ease-out"
         style={{
-          left: coords.x,
-          top: coords.y,
+          left: `${coords.x}px`,
+          top: `${coords.y}px`,
           transform: `translate(-50%, -50%) scale(${isBent ? 0.8 : 1})`,
         }}
       >
@@ -207,7 +216,7 @@ export default function GestureOverlay({ handPointer, termColor }: GestureOverla
           {hoveredElementLabel ? (
             <span>
               正对准: <strong className="text-yellow-400">{hoveredElementLabel}</strong> 
-              {isBent ? ' (合指点按)' : ` (${Math.round(dwellProgress * 100)}% 悬停对位)`}
+              {isBent ? ' (合指点按/弯拢锁定)' : hoveredElementLabel === '天地日晷盘' ? ' (弯拢/合指锁定)' : ` (${Math.round(dwellProgress * 100)}% 悬停对位)`}
             </span>
           ) : (
             <span className="opacity-75">悬停或合指，对准界面交互</span>

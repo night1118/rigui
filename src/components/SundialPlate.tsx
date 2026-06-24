@@ -26,7 +26,7 @@ export default function SundialPlate({
 }: SundialPlateProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [relativePos, setRelativePos] = useState({ dx: 0, dy: 0, distance: 0, angle: 0 });
+  const [relativePos, setRelativePos] = useState({ dx: 0, dy: 0, distance: 0, distancePx: 0, angle: 0 });
   const [currentHour, setCurrentHour] = useState<HourMapping>(hoursData[6]); // default noon (午时)
 
   // Get active season's solar terms, sorted by shadow level (0 = innermost, 5 = outermost)
@@ -65,7 +65,7 @@ export default function SundialPlate({
     let angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
     angleDeg = (angleDeg + 90 + 360) % 360;
 
-    setRelativePos({ dx, dy, distance: rNorm, angle: angleDeg });
+    setRelativePos({ dx, dy, distance: rNorm, distancePx, angle: angleDeg });
   };
 
   // Listen to hand pointer coordinate changes
@@ -73,26 +73,30 @@ export default function SundialPlate({
     if (isShadowFixed || !handPointer || !handPointer.isActive || !containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
-    const cx = rect.width / 2;
-    const cy = rect.height / 2;
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
 
-    // Map normalized coordinates to the plate bounding container
-    const x = handPointer.x * rect.width;
-    const y = handPointer.y * rect.height;
+    // Get actual viewport pixel coordinates of hand pointer (handPointer coordinates are normalized screen coordinates)
+    const px_X = handPointer.x * window.innerWidth;
+    const px_Y = handPointer.y * window.innerHeight;
 
-    setMousePos({ x, y });
-
-    const dx = x - cx;
-    const dy = y - cy;
+    // Calculate exact pixel delta from the center of the sundial to the hand pointer on screen
+    const dx = px_X - centerX;
+    const dy = px_Y - centerY;
 
     const distancePx = Math.sqrt(dx * dx + dy * dy);
+    
+    // Normalize distance by plate radius
     const maxRadius = Math.min(rect.width, rect.height) / 2;
     const rNorm = Math.min(distancePx / maxRadius, 1.05);
 
     let angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
     angleDeg = (angleDeg + 90 + 360) % 360;
 
-    setRelativePos({ dx, dy, distance: rNorm, angle: angleDeg });
+    // Local coordinate representation within the card frame if needed
+    setMousePos({ x: px_X - rect.left, y: px_Y - rect.top });
+
+    setRelativePos({ dx, dy, distance: rNorm, distancePx, angle: angleDeg });
   }, [handPointer, isShadowFixed]);
 
   // Trigger lock if fingers are bent
@@ -426,7 +430,7 @@ export default function SundialPlate({
                   left: '50%',
                   top: '50%',
                   transform: `rotate(${relativePos.angle - 90}deg)`,
-                  width: `${relativePos.distance * 180}px`,
+                  width: `${relativePos.distancePx}px`,
                   height: '16px',
                   marginTop: '-8px',
                   background: `linear-gradient(to right, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.6) 60%, rgba(0, 0, 0, 0) 100%)`,
@@ -441,7 +445,7 @@ export default function SundialPlate({
                   left: '50%',
                   top: '50%',
                   transform: `rotate(${relativePos.angle - 90}deg)`,
-                  width: `${relativePos.distance * 180}px`,
+                  width: `${relativePos.distancePx}px`,
                   height: '6px',
                   marginTop: '-3px',
                   background: `linear-gradient(to right, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.85) 50%, rgba(0, 0, 0, 0) 100%)`,
@@ -457,7 +461,7 @@ export default function SundialPlate({
                   left: '50%',
                   top: '50%',
                   transform: `rotate(${relativePos.angle - 90}deg)`,
-                  width: `${relativePos.distance * 175}px`,
+                  width: `${Math.max(0, relativePos.distancePx - 5)}px`,
                   height: '1px',
                   marginTop: '4px',
                   background: `linear-gradient(to right, ${selectedTerm.themeColor}aa 0%, transparent 80%)`,
@@ -476,7 +480,7 @@ export default function SundialPlate({
                 top: '50%',
                 // Standard sun rays align directly in the opposite direction (offset by 180 degrees)
                 transform: `rotate(${relativePos.angle + 90}deg)`,
-                width: '180px',
+                width: `${relativePos.distancePx}px`,
                 height: '32px',
                 marginTop: '-16px',
                 background: `linear-gradient(to right, ${selectedTerm.themeColor}44 0%, ${selectedTerm.themeColor}15 65%, transparent 100%)`,

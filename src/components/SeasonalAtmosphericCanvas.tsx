@@ -5,6 +5,7 @@ interface SeasonalAtmosphericCanvasProps {
   handPointer: HandData | null;
   season: 'spring' | 'summer' | 'autumn' | 'winter';
   termColor?: string;
+  className?: string; // Custom z-index class or positioning styles
   onRightTrigger?: () => void; // Trigger page transition when pointer is held in the right sidebar
 }
 
@@ -12,6 +13,7 @@ export default function SeasonalAtmosphericCanvas({
   handPointer,
   season,
   termColor = '#3b82f6',
+  className = "absolute inset-0 w-full h-full pointer-events-none z-0",
   onRightTrigger,
 }: SeasonalAtmosphericCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -63,7 +65,21 @@ export default function SeasonalAtmosphericCanvas({
       pointerRef.current.targetY = rawY / rect.height;
     };
 
+    // Touch Fallback Listener for mobile fingers
+    const handleTouchMove = (e: TouchEvent) => {
+      if (handPointerRef.current && handPointerRef.current.isActive) return;
+      if (e.touches && e.touches[0]) {
+        const rect = canvas.getBoundingClientRect();
+        const rawX = e.touches[0].clientX - rect.left;
+        const rawY = e.touches[0].clientY - rect.top;
+
+        pointerRef.current.targetX = rawX / rect.width;
+        pointerRef.current.targetY = rawY / rect.height;
+      }
+    };
+
     window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
 
     // Particle definition
     interface Particle {
@@ -139,7 +155,8 @@ export default function SeasonalAtmosphericCanvas({
           },
         };
       } else {
-        // Winter Snowflakes
+        // Winter Snowflakes: Beautiful varying shades of Ice Blue
+        const iceBlues = ['#e0f2fe', '#bae6fd', '#7dd3fc', '#a5f3fc', '#cffafe', '#e0f7fa', '#ffffff'];
         return {
           x: startX,
           y: startY,
@@ -149,7 +166,7 @@ export default function SeasonalAtmosphericCanvas({
           opacity: Math.random() * 0.5 + 0.3,
           spin: Math.random() * 360,
           spinSpeed: Math.random() * 1.5 - 0.75,
-          color: '#ffffff',
+          color: iceBlues[Math.floor(Math.random() * iceBlues.length)],
         };
       }
     };
@@ -168,15 +185,15 @@ export default function SeasonalAtmosphericCanvas({
       // Clear layout
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Smooth coordinate interpolation (Lagging delay for hand pointer movement aesthetic)
+      // Smooth coordinate interpolation -> Faster following response (0.45 simulated, 0.55 real-time target)
       const p = pointerRef.current;
       if (p.targetX !== -1000) {
         if (p.x === -1000) {
           p.x = p.targetX;
           p.y = p.targetY;
         } else {
-          p.x = p.x * 0.82 + p.targetX * 0.18;
-          p.y = p.y * 0.82 + p.targetY * 0.18;
+          p.x = p.x * 0.45 + p.targetX * 0.55;
+          p.y = p.y * 0.45 + p.targetY * 0.55;
         }
       }
 
@@ -213,40 +230,36 @@ export default function SeasonalAtmosphericCanvas({
           const dy = pointerPx_Y - part.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
 
-          if (dist < 320) {
-            // General attraction/swirl radius is 320px
-            const force = (320 - dist) / 320; // 1 at center, 0 at outer edge
-            
-            // Core physical pull towards the pointer hook
-            const speedFactor = force * 4.0;
-            const pullX = (dx / (dist || 1)) * speedFactor;
-            const pullY = (dy / (dist || 1)) * speedFactor;
+          // Full-page attraction range (uses the maximum length of window diagonal)
+          const maxDist = Math.max(canvas.width, canvas.height, 1400);
+          
+          // Linear / custom decay force covering the whole page
+          const force = Math.max(0, (maxDist - dist) / maxDist);
+          
+          // Snappy speeds & strong dramatic response
+          const speedFactor = force * 6.5; // Faster gravity acceleration
+          const pullX = (dx / (dist || 1)) * speedFactor;
+          const pullY = (dy / (dist || 1)) * speedFactor;
 
-            // Swirl around the finger to make it look flowy
-            const swirlX = (-dy / (dist || 1)) * force * 1.8;
-            const swirlY = (dx / (dist || 1)) * force * 1.8;
+          // Stronger vortex swirl effect
+          const swirlX = (-dy / (dist || 1)) * force * 2.8;
+          const swirlY = (dx / (dist || 1)) * force * 2.8;
 
-            attractionX = pullX + swirlX;
-            attractionY = pullY + swirlY;
+          attractionX = pullX + swirlX;
+          attractionY = pullY + swirlY;
 
-            // Increase opacity for particles clustering near the finger to make it look even denser (手指部分最密)
-            part.opacity = Math.min(part.opacity + 0.12, 0.95);
+          // Increase opacity for particles clustering near the finger
+          part.opacity = Math.min(part.opacity + 0.15, 0.98);
 
-            // Dynamically scale size slightly near the center point
-            if (part.customData && typeof part.customData === 'object') {
-              if (part.customData.baseSize === undefined) {
-                part.customData.baseSize = part.size;
-              }
-              part.size = part.customData.baseSize * (1.0 + force * 0.4);
-            } else {
-              part.customData = { baseSize: part.size };
-              part.size = part.size * (1.0 + force * 0.4);
+          // Dynamically scale size beautifully near the center point
+          if (part.customData && typeof part.customData === 'object') {
+            if (part.customData.baseSize === undefined) {
+              part.customData.baseSize = part.size;
             }
+            part.size = part.customData.baseSize * (1.0 + force * 0.5);
           } else {
-            // If it drifts far, gently restore base size
-            if (part.customData && typeof part.customData === 'object' && part.customData.baseSize !== undefined) {
-              part.size = part.size * 0.95 + part.customData.baseSize * 0.05;
-            }
+            part.customData = { baseSize: part.size };
+            part.size = part.size * (1.0 + force * 0.5);
           }
         }
 
@@ -320,7 +333,7 @@ export default function SeasonalAtmosphericCanvas({
         } else {
           // Winter snowflake crystals (Draw small elegant star dots or real 6-branch snowflake structures)
           if (part.size > 2.8) {
-            ctx.strokeStyle = '#ffffff';
+            ctx.strokeStyle = part.color || '#a5f3fc';
             ctx.lineWidth = 1.0;
             ctx.globalAlpha = part.opacity;
             // Draw a delicate 6-branch crystal
@@ -345,7 +358,7 @@ export default function SeasonalAtmosphericCanvas({
             ctx.fillStyle = part.color;
             ctx.globalAlpha = part.opacity;
             if (part.size > 2.0) {
-              ctx.shadowColor = '#e0f2fe';
+              ctx.shadowColor = part.color || '#e0f2fe';
               ctx.shadowBlur = 4;
             }
             ctx.fill();
@@ -416,8 +429,9 @@ export default function SeasonalAtmosphericCanvas({
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('touchmove', handleTouchMove);
     };
   }, [season, termColor, onRightTrigger]);
 
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-0" />;
+  return <canvas ref={canvasRef} className={className} />;
 }
