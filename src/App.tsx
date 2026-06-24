@@ -8,10 +8,10 @@ import GestureOverlay from './components/GestureOverlay';
 import { Compass, CalendarDays, BookOpen, Clock, Waves, ChevronRight, Wind, Snowflake, Flame, Sun, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-const springImg = '/src/assets/images/season_spring_1781752388171.jpg';
-const summerImg = '/src/assets/images/season_summer_1781752400894.jpg';
-const autumnImg = '/src/assets/images/season_autumn_1781752412470.jpg';
-const winterImg = '/src/assets/images/season_winter_1781752421896.jpg';
+const springImg = new URL('./assets/images/season_spring_1781752388171.jpg', import.meta.url).href;
+const summerImg = new URL('./assets/images/season_summer_1781752400894.jpg', import.meta.url).href;
+const autumnImg = new URL('./assets/images/season_autumn_1781752412470.jpg', import.meta.url).href;
+const winterImg = new URL('./assets/images/season_winter_1781752421896.jpg', import.meta.url).href;
 
 export default function App() {
   const [activeSeason, setActiveSeason] = useState<Season>('spring');
